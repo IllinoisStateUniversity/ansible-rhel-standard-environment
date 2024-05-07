@@ -1,0 +1,8 @@
+---
+- name: Setup Users for Indirect AD Integration
+  ansible.builtin.import_tasks: users_indirect_ad_integration.yml
+  when: "'config_redhat_environment_standard_adjoin' not in group_names"
+
+- name: Setup Users for Direct AD Integration
+  ansible.builtin.import_tasks: users_direct_ad_integration.yml
+  when: "'config_redhat_environment_standard_adjoin' in group_names"

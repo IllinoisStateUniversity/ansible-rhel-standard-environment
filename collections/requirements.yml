@@ -1,0 +1,8 @@
+---
+collections:
+  - name: community.general
+  - name: redhat.rhel_system_roles
+  - name: ansible.posix
+  - name: ansible.controller
+  - name: redhat.insights
+  - name: fedora.linux_system_roles

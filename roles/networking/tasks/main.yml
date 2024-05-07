@@ -1,0 +1,48 @@
+---
+- name: Install dnsmasq
+  ansible.builtin.yum:
+    name:
+      - dnsmasq
+    state: present
+
+- name: Start and Enable dnsmasq
+  ansible.builtin.service:
+    name: dnsmasq
+    state: started
+    enabled: true
+
+- name: Copy /etc/resolv.conf for dnsmasq
+  ansible.builtin.copy:
+    src: files/resolv.conf
+    dest: /etc/
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart dnsmasq
+
+- name: Copy /etc/resolv.dnsmasq for dnsmasq
+  ansible.builtin.copy:
+    src: files/resolv.dnsmasq
+    dest: /etc/
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart dnsmasq
+
+- name: Drop dnsmasq Config into /etc/dnsmasq.d/ for Pick Up
+  ansible.builtin.copy:
+    src: files/dnsmasq-domain.conf
+    dest: /etc/dnsmasq.d/
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart dnsmasq
+
+- name: Copy a File to Disable NetworkManager's DNS Plugin
+  ansible.builtin.copy:
+    src: files/00-dnsmasq.conf
+    dest: /etc/NetworkManager/conf.d/
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart NetworkManager

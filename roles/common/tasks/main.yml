@@ -1,0 +1,17 @@
+---
+- name: Set Hostname to FQDN
+  ansible.builtin.hostname:
+    name: "{{ ansible_fqdn | lower }}"
+
+- name: Add Inventory Group - config_redhat_environment_standard
+  ansible.controller.group:
+    name: config_redhat_environment_standard
+    inventory: All Systems - OrgName
+    hosts: "{{ inventory_hostname }}"
+    preserve_existing_hosts: true
+    controller_host: "{{ controller_host }}"
+    controller_username: "{{ controller_username }}"
+    controller_password: "{{ controller_password }}"
+    validate_certs: "{{ validate_certs }}"
+  delegate_to: localhost
+  become: false

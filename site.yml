@@ -1,0 +1,41 @@
+---
+- name: RHEL Standard Environment
+  hosts: "{{ survey_hostname | default(survey_hosts) }}"
+  gather_facts: true
+  vars_files:
+    - "vars/{{ (aap_environment == 'prod') | ternary('aap_prod.yml', 'aap_test.yml') }}"
+
+  # Survey Vars
+  # survey_hostname / survey_hosts
+
+  pre_tasks:
+    # Variable Needed for packages and firewall role
+    - name: Check if Cockpit is Installed
+      ansible.builtin.yum:
+        list: cockpit
+        disablerepo: "*"
+      register: cockpit_pkg_status
+
+    # Facts Needed for packages and firewall role
+    - name: Check Port 9090 for Usage for Cockpit Conflicts
+      community.general.listen_ports_facts:
+
+  roles:
+    - role: common
+
+    - role: time
+
+    - role: networking
+      when:
+        - "'tag_application_bind' not in group_names"
+
+    - role: packages
+      when:
+        - "'tag_application_satellite' not in group_names"
+
+    - role: firewall
+
+    - role: auth
+
+    - role: users
+      tags: users

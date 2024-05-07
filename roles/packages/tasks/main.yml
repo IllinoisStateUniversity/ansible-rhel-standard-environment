@@ -1,0 +1,28 @@
+---
+- name: Ensure Server is Registered with Satellite
+  community.general.redhat_subscription:
+    state: present
+    server_hostname: "{{ ('tag_environment_prod' in group_names) | ternary('satellite.your.domain.edu', 'satellite-test.your.domain.edu') }}"
+    org_id: ORGID
+    activationkey: ACTKEYHERE
+
+- name: Install Cockpit
+  ansible.builtin.include_role:
+    name: redhat.rhel_system_roles.cockpit
+  when:
+    - ( 9090 not in ansible_facts.tcp_listen | map(attribute='port') | list ) or ( cockpit_pkg_status.results | selectattr('yumstate', 'equalto', 'installed') | list | length > 0 )
+
+- name: Install Additional packages
+  ansible.builtin.yum:
+    name:
+      - net-tools
+      - insights-client
+      - sos
+      - setroubleshoot-server
+      - vim
+      - htop
+    state: present
+
+- name: Register With Red Hat Insights
+  redhat.insights.insights_register:
+    state: present

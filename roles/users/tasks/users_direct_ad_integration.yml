@@ -1,0 +1,44 @@
+---
+- name: Set Variable for AD domain_suffix & IT Resource Owner Team Attribute
+  ansible.builtin.set_fact:
+    domain_suffix: "{{ vars[group_names | select('match', '^tag_environment_.*') | map('regex_replace', '^tag_environment_(.*)$', 'domain_suffix_\\1') | first] }}" # domain_suffix_test/dev/prod
+    resource_owner_teamattribute: "{{ group_names | select('match', '^tag_resourceowner_.*') | map('regex_replace', '^tag_resourceowner_(.*)$', '\\1') | first }}"
+
+# Realm Permits
+- name: Check Existing Users and Groups on the Realm Permitted Logins List
+  ansible.builtin.command:
+    cmd: realm list
+  register: realm_list_output
+  changed_when: false
+
+- name: Add Infra Team to the Realm Permitted Login List
+  ansible.builtin.command:
+    cmd: "realm permit --groups your_ad_group_here@{{ domain_suffix }}"
+  when: '"your_ad_group_here@" + domain_suffix not in realm_list_output.stdout'
+
+- name: Add IT Resource Owner to the Realm Permitted Login List
+  ansible.builtin.command:
+    cmd: "realm permit --groups your_ad_group_here_{{ resource_owner_teamattribute }}@{{ domain_suffix }}"
+  when:
+    - '"your_ad_group_here_" + resource_owner_teamattribute + "@" + domain_suffix not in realm_list_output.stdout'
+    - "'tag_resourceowner_infrateam' not in group_names"
+
+# sudoers
+- name: Add Infra Team to sudoers File
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers.d/yoursudoersfile
+    create: true
+    owner: root
+    group: root
+    mode: '0440'
+    line: "%your_ad_group_here@{{ domain_suffix }} ALL=(ALL) ALL"
+
+- name: Add IT Resource Owner to sudoers File
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers.d/yoursudoersfile
+    create: true
+    owner: root
+    group: root
+    mode: '0440'
+    line: "%your_ad_group_here_{{ resource_owner_teamattribute }}@{{ domain_suffix }} ALL=(ALL) ALL"
+  when: "'tag_resourceowner_infrateam' not in group_names"

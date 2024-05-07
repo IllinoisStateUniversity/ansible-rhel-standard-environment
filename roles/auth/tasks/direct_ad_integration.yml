@@ -1,0 +1,159 @@
+---
+- name: Set Variable for IT Resource Owner Team Attribute
+  ansible.builtin.set_fact:
+    resource_owner_teamattribute: "{{ group_names | select('match', '^tag_resourceowner_.*') | map('regex_replace', '^tag_resourceowner_(.*)$', '\\1') | first }}"
+
+- name: Set RHEL System Role Variables for ad_integration (Dev Environment)
+  ansible.builtin.set_fact:
+    ad_integration_realm: your.domain.edu
+    ad_integration_password: "{{ auth_ad_integration_password_dev }}"
+    ad_integration_computer_ou: "OU={{ resource_owner_teamattribute }},OU=Servers,DC=your,DC=domain,DC=edu"
+    ad_integration_sssd_settings: # [sssd] section of the sssd.conf file
+      - key: services
+        value: nss, pam, ssh # add ssh for public key lookup in AD
+
+      - key: default_domain_suffix
+        value: your.domain.edu
+  when: "'tag_environment_dev' in group_names"
+
+- name: Set RHEL System Role Variables for ad_integration (Test Environment)
+  ansible.builtin.set_fact:
+    ad_integration_realm: your.domain.edu
+    ad_integration_password: "{{ auth_ad_integration_password_test }}"
+    ad_integration_computer_ou: "OU={{ resource_owner_teamattribute }},OU=Servers,DC=your,DC=domain,DC=edu"
+    ad_integration_sssd_settings: # [sssd] section of the sssd.conf file
+      - key: services
+        value: nss, pam, ssh # add ssh for public key lookup in AD
+
+      - key: default_domain_suffix
+        value: your.domain.edu
+  when: "'tag_environment_test' in group_names"
+
+- name: Set RHEL System Role Variables for ad_integration (Prod Environment)
+  ansible.builtin.set_fact:
+    ad_integration_realm: your.domain.edu
+    ad_integration_password: "{{ auth_ad_integration_password_prod }}"
+    ad_integration_computer_ou: "OU={{ resource_owner_teamattribute }},OU=Servers,DC=your,DC=domain,DC=edu"
+    ad_integration_sssd_settings: # [sssd] section of the sssd.conf file
+      - key: services
+        value: nss, pam, ssh # add ssh for public key lookup in AD
+
+      - key: default_domain_suffix
+        value: your.domain.edu
+  when: "'tag_environment_prod' in group_names"
+
+- name: Set RHEL System Role Variables for ad_integration (All Environments)
+  ansible.builtin.set_fact:
+    ad_integration_user: "{{ auth_ad_integration_user }}"
+    ad_integration_allow_rc4_crypto: true
+    ad_integration_manage_dns: false
+    ad_dyndns_update: true
+    ad_integration_sssd_custom_settings: # [domain/$REALM] section of the sssd.conf file
+      - key: override_homedir
+        value: /home/%u
+
+      - key: ldap_user_extra_attrs
+        value: altSecurityIdentities
+
+      - key: ldap_user_ssh_public_key
+        value: altSecurityIdentities
+
+      - key: ad_gpo_access_control
+        value: disabled
+
+- name: Set RHEL System Role Variables for ad_integration on Samba using AD (All Environments)
+  ansible.builtin.set_fact:
+    ad_integration_membership_software: samba
+    ad_integration_sssd_custom_settings: # [domain/$REALM] section of the sssd.conf file
+      - key: override_homedir
+        value: /home/%u
+
+      - key: ldap_user_extra_attrs
+        value: altSecurityIdentities
+
+      - key: ldap_user_ssh_public_key
+        value: altSecurityIdentities
+
+      - key: ad_gpo_access_control
+        value: disabled
+
+      - key: ad_update_samba_machine_account_password
+        value: true
+  when: "'config_redhat_environment_standard_samba' in group_names"
+
+- name: Install Samba AD Prereqs for Samba Servers
+  ansible.builtin.yum:
+    name:
+      - samba
+      - samba-winbind
+      - sssd-winbind-idmap # for Winbind to use SSSD for id Mappings - https://access.redhat.com/solutions/3802321
+    state: present
+  when: "'config_redhat_environment_standard_samba' in group_names"
+
+- name: Check if Server is already Joined to the Domain
+  ansible.builtin.command: realm -v list
+  register: check_realm_before_join
+  changed_when: false
+  failed_when: false
+
+- name: Reset krb5.conf on RHEL 9 before AD Join
+  ansible.builtin.copy:
+    src: files/rhel9-default-krb5.conf
+    dest: /etc/krb5.conf
+    owner: root
+    group: root
+    mode: '0644'
+    setype: krb5_conf_t
+  when:
+    - '"domain-name" not in check_realm_before_join.stdout'
+    - (ansible_facts['distribution'] == 'RedHat' and ansible_facts['distribution_major_version'] | int == 9)
+
+- name: Reset krb5.conf on RHEL 8 before AD Join
+  ansible.builtin.copy:
+    src: files/rhel8-default-krb5.conf
+    dest: /etc/krb5.conf
+    owner: root
+    group: root
+    mode: '0644'
+    setype: krb5_conf_t
+  when:
+    - '"domain-name" not in check_realm_before_join.stdout'
+    - (ansible_facts['distribution'] == 'RedHat' and ansible_facts['distribution_major_version'] | int == 8)
+
+- name: Remove /etc/sssd/sssd.conf before AD Join
+  ansible.builtin.file:
+    path: /etc/sssd/sssd.conf
+    state: absent
+  when: '"domain-name" not in check_realm_before_join.stdout'
+
+- name: RHEL System Role - ad_integration # https://github.com/linux-system-roles/ad_integration
+  ansible.builtin.include_role:
+    name: fedora.linux_system_roles.ad_integration
+
+- name: Set SSH AuthorizedKeysCommand to /usr/bin/sss_ssh_authorizedkeys in /etc/ssh/sshd_config # Directory Stored SSH Public Keys
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    line: 'AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys'
+    state: present
+  notify: Restart sshd
+
+- name: Set SSH AuthorizedKeysCommandUser to nobody in /etc/ssh/sshd_config # Directory Stored SSH Public Keys
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    line: 'AuthorizedKeysCommandUser nobody'
+    state: present
+  notify: Restart sshd
+
+- name: Ensure sssd is Selected by authselect
+  ansible.builtin.command:
+    cmd: authselect current -r
+  register: authselect_current
+  changed_when: false
+  failed_when: false
+
+- name: Configure authselect for sssd
+  ansible.builtin.command:
+    cmd: /usr/bin/authselect select sssd --force
+  changed_when: true
+  notify: Restart sssd
+  when: "'sssd' not in authselect_current.stdout"

@@ -1,0 +1,23 @@
+---
+- name: Set TimeZone to Your/Timezone
+  community.general.timezone:
+    name: Your/Timezone
+
+- name: Run timedatectl and Save Output to Variable
+  ansible.builtin.shell: timedatectl
+  changed_when: false
+  register: timedatectl_result
+
+- name: Set hardware clock to use local RTC
+  ansible.builtin.shell: timedatectl set-local-rtc 0
+  when: "'RTC in local TZ: yes' in timedatectl_result.stdout"
+
+- name: Set Time Server Variables for Timesync RHEL System Role
+  ansible.builtin.set_fact:
+    timesync_ntp_servers:
+      - hostname: timeserver.your.domain.edu
+        iburst: true
+
+- name: Configure Timesync NTP Server
+  ansible.builtin.include_role:
+    name: redhat.rhel_system_roles.timesync

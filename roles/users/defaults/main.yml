@@ -1,0 +1,15 @@
+---
+# Domain Suffixes
+domain_suffix_dev: your.domain.edu
+domain_suffix_test: your.domain.edu
+domain_suffix_prod: your.domain.edu
+
+infra_accounts:
+  - name: username
+    uid: 000000000
+    comment: Display Name
+
+teamxyz_accounts:
+  - name: username
+    uid: 000000000
+    comment: Display Name

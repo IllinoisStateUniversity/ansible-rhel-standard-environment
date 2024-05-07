@@ -1,0 +1,26 @@
+---
+- name: Add Infra Accounts
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    uid: "{{ item.uid }}"
+    comment: "{{ item.comment }}"
+    groups: wheel
+    append: true
+    state: present
+  loop: "{{ infra_accounts }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Add IT Resource Owner Accounts
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    uid: "{{ item.uid }}"
+    comment: "{{ item.comment }}"
+    groups: wheel
+    append: true
+    state: present
+  loop: "{{ teamxyz_accounts }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - "'tag_resourceowner_teamxyz' in group_names"

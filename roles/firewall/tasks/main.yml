@@ -1,0 +1,11 @@
+---
+## Look at the RHEL System Role Docs and build a variable yourself
+
+# Do the RHEL System Role for Firewall
+- name: Set the Firewall variable for the Firewall RHEL System Role
+  ansible.builtin.set_fact:
+    firewall: "{{ firewall }}"
+
+- name: Configure Firewall
+  ansible.builtin.include_role:
+    name: redhat.rhel_system_roles.firewall

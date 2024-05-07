@@ -1,0 +1,53 @@
+---
+# tasks file for auth
+- name: Setup Indirect AD Integration
+  ansible.builtin.import_tasks: indirect_ad_integration.yml
+  when:
+    - ansible_facts['distribution'] == "RedHat" and ansible_distribution_major_version >= "8"
+    - "'config_redhat_environment_standard_adjoin' not in group_names"
+
+- name: Setup Direct AD Integration
+  ansible.builtin.import_tasks: direct_ad_integration.yml
+  when:
+    - ansible_facts['distribution'] == "RedHat" and ansible_distribution_major_version >= "8"
+    - "'config_redhat_environment_standard_adjoin' in group_names"
+
+- name: Set SSH LoginGraceTime to 1m in sshd_config for RHEL 8 and earlier
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?LoginGraceTime'
+    line: 'LoginGraceTime 1m'
+    state: present
+  when: (ansible_facts['distribution'] == 'RedHat' and ansible_facts['distribution_major_version'] | int <= 8)
+  notify: Restart sshd
+
+- name: Allow SSH Key Auth for root via PermitRootLogin setting in sshd_config for RHEL 8
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin'
+    line: 'PermitRootLogin prohibit-password'
+    state: present
+  when: (ansible_facts['distribution'] == 'RedHat' and ansible_facts['distribution_major_version'] | int == 8)
+  notify: Restart sshd
+
+- name: Enable SSH PasswordAuthentication in sshd_config for RHEL 8 and earlier
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication yes'
+    state: present
+  when: (ansible_facts['distribution'] == 'RedHat' and ansible_facts['distribution_major_version'] | int <= 8)
+  notify: Restart sshd
+
+- name: Create an sshd config file for RHEL 9 and above
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/99-ssh.conf
+    content: |
+      LoginGraceTime 1m
+      PermitRootLogin prohibit-password
+      PasswordAuthentication yes
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart sshd
+  when: (ansible_facts['distribution'] == 'RedHat' and ansible_facts['distribution_major_version'] | int >= 9)

@@ -1,0 +1,5 @@
+---
+auth_ad_integration_user: ad_user_example
+auth_ad_integration_password_dev:
+auth_ad_integration_password_test:
+auth_ad_integration_password_prod:
