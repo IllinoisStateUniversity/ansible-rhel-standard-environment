@@ -1,4 +1,4 @@
-# RHEL Standard Environment Ansible Playbook
+# RHEL - Standard Environment
 
 ## Overview
 
